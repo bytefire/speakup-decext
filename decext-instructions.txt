@@ -36,7 +36,8 @@ Here are the steps in detail. Before starting this, please download following tw
 
 4. Compile and install:
 	(IMPORTANT: for this please check an online guide specific for your distro.
-	  following instructions that i think should work on Debian based system. but it may 
+	  following instructions that i think should work on Debian based system. but it may still
+	  break your system so following steps are not guaranteed to work)
 	a. still stayin inside linux-4.10.9, compile by simply running: make
 	(this will take a while. depending on the hardware specs, it may take an hour or may be more)
 	b. after make completes, check it succeeded: echo $?
