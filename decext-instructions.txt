@@ -1,0 +1,54 @@
+Hi,
+
+Here are the steps in detail. Before starting this, please download following two files that I have shared:
+
+
+1. Download Linux kernel code:
+	a. download stable kernel source from https://cdn.kernel.org/pub/linux/kernel/v4.x/linux-4.10.9.tar.xz
+	b. extract the archive by running: tar xvfJ linux-4.10.9.tar.xz
+
+2. Apply patches:
+	a. cd into the extracted linux source code: cd linux-4.10.9
+	b. remove speakup directory: rm -r drivers/staging/speakup
+	c. copy the speakup.tgz file into drivers/staging: cp path/to/speakup.tgz drivers/staging/
+	d. cd into staging directory: cd drivers/staging
+	e. extractspeakup.tgz: tar xvfz speakup.tgz
+	(now there should be a speakup directory inside drivers/staging)
+	f. cd back to the root of kernel source (i.e. linux-4.10.9) : cd ../..
+	g. apply the tty patch: patch -p1 < path/to/tty-export.patch
+	(output of above should be following three lines:
+		patching file drivers/tty/tty_io.c
+		patching file drivers/tty/tty_port.c
+		patching file include/linux/tty.h)
+	(if you don't already have 'patch' program then you can download it from http://savannah.gnu.org/projects/patch/)
+	h. now we have the code ready for configuring and compiling!
+
+3. Configure:
+	a. make sure you are inside kernel source root directory, i.e. linux-4.10.9
+	b. make sure that existing kernel config exists: ls /boot/config-$(uname -r)
+	(this should return just one file named config-<your-kernel-version>)
+	c. copy that file into your kernel source root directory: cp /boot/config-$(uname -r) ./.config
+	d. update the config: make oldconfig
+	(this will ask you many questions. just select the default option for each by pressing enter)
+	e. check to make sure that speakup is configured the way you wanted it: cat .config | grep SPEAKUP
+	e. that's it, kernel configured!
+
+4. Compile and install:
+	(IMPORTANT: for this please check an online guide specific for your distro.
+	  following instructions that i think should work on Debian based system. but it may 
+	a. still stayin inside linux-4.10.9, compile by simply running: make
+	(this will take a while. depending on the hardware specs, it may take an hour or may be more)
+	b. after make completes, check it succeeded: echo $?
+	(this should return zero)
+	c. now run: sudo make modules_install
+	(again this may take a little while)
+	d. now install kernel which should be quick: sudo make install
+	(NOTE: this means that on next reboot your newly compiled kernel will load)
+	(Depending on your distro, it should back up previous kernel)
+
+5. Reboot and test decext:
+	a. now running reboot should boot the compiled kernel
+	b. if speakup configuration was same as before, then you should be able to test it with decext the same way as before.
+
+
+	

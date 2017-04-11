@@ -1,0 +1,86 @@
+Index: linux-4.10.1/drivers/tty/tty_io.c
+===================================================================
+--- linux-4.10.1.orig/drivers/tty/tty_io.c
++++ linux-4.10.1/drivers/tty/tty_io.c
+@@ -855,7 +855,7 @@
+ 
+ int tty_hung_up_p(struct file *filp)
+ {
+-	return (filp->f_op == &hung_up_tty_fops);
++	return (filp && filp->f_op == &hung_up_tty_fops);
+ }
+ 
+ EXPORT_SYMBOL(tty_hung_up_p);
+@@ -1368,7 +1368,10 @@
+	struct tty_struct *tty;
+ 
+	if (driver->ops->lookup)
+-		tty = driver->ops->lookup(driver, file, idx);
++		if (!file)
++			tty = ERR_PTR(-EIO);
++		else
++			tty = driver->ops->lookup(driver, file, idx);
+	else
+		tty = driver->ttys[idx];
+ 
+@@ -1986,7 +1989,7 @@
+		struct tty_driver *console_driver = console_device(index);
+		if (console_driver) {
+			driver = tty_driver_kref_get(console_driver);
+-			if (driver) {
++			if (driver && filp) {
+				/* Don't let /dev/console block */
+				filp->f_flags |= O_NONBLOCK;
+				break;
+@@ -2019,7 +2022,7 @@
+  *	  - concurrent tty driver removal w/ lookup
+  *	  - concurrent tty removal from driver table
+  */
+-static struct tty_struct *tty_open_by_driver(dev_t device, struct inode *inode,
++struct tty_struct *tty_open_by_driver(dev_t device, struct inode *inode,
+					     struct file *filp)
+ {
+	struct tty_struct *tty;
+@@ -2064,6 +2067,7 @@
+	tty_driver_kref_put(driver);
+	return tty;
+ }
++EXPORT_SYMBOL(tty_open_by_driver);
+ 
+ /**
+  *	tty_open		-	open a tty device
+Index: linux-4.10.1/drivers/tty/tty_port.c
+===================================================================
+--- linux-4.10.1.orig/drivers/tty/tty_port.c
++++ linux-4.10.1/drivers/tty/tty_port.c
+@@ -335,7 +335,7 @@
+  *	tty_port_block_til_ready	-	Waiting logic for tty open
+  *	@port: the tty port being opened
+  *	@tty: the tty device being bound
+- *	@filp: the file pointer of the opener
++ *	@filp: the file pointer of the opener or NULL
+  *
+  *	Implement the core POSIX/SuS tty behaviour when opening a tty device.
+  *	Handles:
+@@ -369,7 +369,7 @@
+		tty_port_set_active(port, 1);
+		return 0;
+	}
+-	if (filp->f_flags & O_NONBLOCK) {
++	if (filp ==  NULL || filp->f_flags & O_NONBLOCK) {
+		/* Indicate we are open */
+		if (C_BAUD(tty))
+			tty_port_raise_dtr_rts(port);
+Index: linux-4.10.1/include/linux/tty.h
+===================================================================
+--- linux-4.10.1.orig/include/linux/tty.h
++++ linux-4.10.1/include/linux/tty.h
+@@ -394,6 +394,8 @@
+ /* tty_io.c */
+ extern int __init tty_init(void);
+ extern const char *tty_name(const struct tty_struct *tty);
++extern struct tty_struct *tty_open_by_driver(dev_t device, struct inode *inode,
++					     struct file *filp);
+ #else
+ static inline void console_init(void)
+ { }
