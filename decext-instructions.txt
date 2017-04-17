@@ -1,7 +1,7 @@
 Hi,
 
 Here are the steps in detail. Before starting this, please download following two files that I have shared:
-> speakup.tgz: https://github.com/bytefire/speakup-decext/raw/master/speakup.tgz
+> speakup.tgz: https://github.com/bytefire/speakup-decext/raw/master/speakup2.tgz
 > tty-export.patch: https://github.com/bytefire/speakup-decext/raw/master/tty-export.patch
 
 Also not that this set up can be use to test all drivers with latest changes and not just decext. The changes are all
