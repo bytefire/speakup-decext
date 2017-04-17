@@ -4,6 +4,9 @@ Here are the steps in detail. Before starting this, please download following tw
 > speakup.tgz: https://github.com/bytefire/speakup-decext/raw/master/speakup.tgz
 > tty-export.patch: https://github.com/bytefire/speakup-decext/raw/master/tty-export.patch
 
+Also not that this set up can be use to test all drivers with latest changes and not just decext. The changes are all
+those that were in Greg K-H's staging tree's staging-next branch on 2 April.
+
 1. Download Linux kernel code:
 	a. download stable kernel source from https://cdn.kernel.org/pub/linux/kernel/v4.x/linux-4.10.9.tar.xz
 	b. extract the archive by running: tar xvfJ linux-4.10.9.tar.xz
@@ -17,10 +20,12 @@ Here are the steps in detail. Before starting this, please download following tw
 	(now there should be a speakup directory inside drivers/staging)
 	f. cd back to the root of kernel source (i.e. linux-4.10.9) : cd ../..
 	g. apply the tty patch: patch -p1 < path/to/tty-export.patch
-	(output of above should be following three lines:
+	(output of above should be following five lines:
 		patching file drivers/tty/tty_io.c
 		patching file drivers/tty/tty_port.c
-		patching file include/linux/tty.h)
+		patching file include/linux/tty.h
+		patching file drivers/tty/tty_ldisc.c
+		patching file include/uapi/linux/tty.h
 	(if you don't already have 'patch' program then you can download it from http://savannah.gnu.org/projects/patch/)
 	h. now we have the code ready for configuring and compiling!
 

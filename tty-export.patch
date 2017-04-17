@@ -84,3 +84,34 @@ Index: linux-4.10.1/include/linux/tty.h
  #else
  static inline void console_init(void)
  { }
+Index: linux-stable/drivers/tty/tty_ldisc.c
+===================================================================
+--- linux-stable.orig/drivers/tty/tty_ldisc.c
++++ linux-stable/drivers/tty/tty_ldisc.c
+@@ -602,6 +602,7 @@
+ 	tty_unlock(tty);
+ 	return retval;
+ }
++EXPORT_SYMBOL(tty_set_ldisc);
+ 
+ /**
+  *	tty_ldisc_kill	-	teardown ldisc
+@@ -794,6 +795,7 @@
+ 
+ 	tty_ldisc_debug(tty, "released\n");
+ }
++EXPORT_SYMBOL(tty_ldisc_release);
+ 
+ /**
+  *	tty_ldisc_init		-	ldisc setup for new tty
+Index: linux-stable/include/uapi/linux/tty.h
+===================================================================
+--- linux-stable.orig/include/uapi/linux/tty.h
++++ linux-stable/include/uapi/linux/tty.h
+@@ -35,5 +35,6 @@
+ #define N_TRACESINK	23	/* Trace data routing for MIPI P1149.7 */
+ #define N_TRACEROUTER	24	/* Trace data routing for MIPI P1149.7 */
+ #define N_NCI		25	/* NFC NCI UART */
++#define N_SPEAKUP	26      /* Speakup communication with synths*/
+ 
+ #endif /* _UAPI_LINUX_TTY_H */
