@@ -1,8 +1,65 @@
-Index: linux-4.10.1/drivers/tty/tty_io.c
-===================================================================
---- linux-4.10.1.orig/drivers/tty/tty_io.c
-+++ linux-4.10.1/drivers/tty/tty_io.c
-@@ -855,7 +855,7 @@
+diff --git a/drivers/tty/tty_io.c b/drivers/tty/tty_io.c
+index 734a635e7363..1553e921fb2c 100644
+--- a/drivers/tty/tty_io.c
++++ b/drivers/tty/tty_io.c
+@@ -324,6 +324,56 @@ static struct tty_driver *get_tty_driver(dev_t device, int *index)
+ 	return NULL;
+ }
+ 
++/**
++ *	tty_dev_name_to_number	-	return dev_t for device name
++ *	@name: user space name of device under /dev
++ *	@number: pointer to dev_t that this function will populate
++ *
++ *	This function converts device names like ttyS0 or ttyUSB1 into dev_t
++ *	like (4, 64) or (188, 1). If no corresponding driver is registered then
++ *	the function returns -ENODEV.
++ *
++ *	Locking: this acquires tty_mutex to protect the tty_drivers list from
++ *		being modified while we are traversing it, and makes sure to
++ *		release it before exiting.
++ */
++int tty_dev_name_to_number(const char *name, dev_t *number)
++{
++	struct tty_driver *p;
++	int ret;
++	int index, prefix_length = 0;
++	char *str;
++
++	for (str = name; *str && !isdigit(*str); str++)
++		;
++
++	if (!*str)
++		return -EINVAL;
++
++	ret = kstrtoint(str, 10, &index);
++	if (ret)
++		return ret;
++
++	prefix_length = str - name;
++	mutex_lock(&tty_mutex);
++
++	list_for_each_entry(p, &tty_drivers, tty_drivers)
++		if (prefix_length == strlen(p->name) && strncmp(name,
++					p->name, prefix_length) == 0) {
++			if (index < p->num) {
++				*number = MKDEV(p->major, p->minor_start + index);
++				goto out;
++			}
++		}
++
++	/* if here then driver wasn't found */
++	ret = -ENODEV;
++out:
++	mutex_unlock(&tty_mutex);
++	return ret;
++}
++EXPORT_SYMBOL_GPL(tty_dev_name_to_number);
++
+ #ifdef CONFIG_CONSOLE_POLL
+ 
+ /**
+@@ -855,7 +905,7 @@ static void tty_vhangup_session(struct tty_struct *tty)
  
  int tty_hung_up_p(struct file *filp)
  {
@@ -11,49 +68,69 @@ Index: linux-4.10.1/drivers/tty/tty_io.c
  }
  
  EXPORT_SYMBOL(tty_hung_up_p);
-@@ -1368,7 +1368,10 @@
-	struct tty_struct *tty;
+@@ -1368,7 +1418,10 @@ static struct tty_struct *tty_driver_lookup_tty(struct tty_driver *driver,
+ 	struct tty_struct *tty;
  
-	if (driver->ops->lookup)
+ 	if (driver->ops->lookup)
 -		tty = driver->ops->lookup(driver, file, idx);
 +		if (!file)
 +			tty = ERR_PTR(-EIO);
 +		else
 +			tty = driver->ops->lookup(driver, file, idx);
-	else
-		tty = driver->ttys[idx];
+ 	else
+ 		tty = driver->ttys[idx];
  
-@@ -1986,7 +1989,7 @@
-		struct tty_driver *console_driver = console_device(index);
-		if (console_driver) {
-			driver = tty_driver_kref_get(console_driver);
+@@ -1986,7 +2039,7 @@ static struct tty_driver *tty_lookup_driver(dev_t device, struct file *filp,
+ 		struct tty_driver *console_driver = console_device(index);
+ 		if (console_driver) {
+ 			driver = tty_driver_kref_get(console_driver);
 -			if (driver) {
 +			if (driver && filp) {
-				/* Don't let /dev/console block */
-				filp->f_flags |= O_NONBLOCK;
-				break;
-@@ -2019,7 +2022,7 @@
+ 				/* Don't let /dev/console block */
+ 				filp->f_flags |= O_NONBLOCK;
+ 				break;
+@@ -2019,7 +2072,7 @@ static struct tty_driver *tty_lookup_driver(dev_t device, struct file *filp,
   *	  - concurrent tty driver removal w/ lookup
   *	  - concurrent tty removal from driver table
   */
 -static struct tty_struct *tty_open_by_driver(dev_t device, struct inode *inode,
 +struct tty_struct *tty_open_by_driver(dev_t device, struct inode *inode,
-					     struct file *filp)
+ 					     struct file *filp)
  {
-	struct tty_struct *tty;
-@@ -2064,6 +2067,7 @@
-	tty_driver_kref_put(driver);
-	return tty;
+ 	struct tty_struct *tty;
+@@ -2064,6 +2117,7 @@ static struct tty_struct *tty_open_by_driver(dev_t device, struct inode *inode,
+ 	tty_driver_kref_put(driver);
+ 	return tty;
  }
 +EXPORT_SYMBOL(tty_open_by_driver);
  
  /**
   *	tty_open		-	open a tty device
-Index: linux-4.10.1/drivers/tty/tty_port.c
-===================================================================
---- linux-4.10.1.orig/drivers/tty/tty_port.c
-+++ linux-4.10.1/drivers/tty/tty_port.c
-@@ -335,7 +335,7 @@
+diff --git a/drivers/tty/tty_ldisc.c b/drivers/tty/tty_ldisc.c
+index 68947f6de5ad..bb38c19966b4 100644
+--- a/drivers/tty/tty_ldisc.c
++++ b/drivers/tty/tty_ldisc.c
+@@ -602,6 +602,7 @@ int tty_set_ldisc(struct tty_struct *tty, int disc)
+ 	tty_unlock(tty);
+ 	return retval;
+ }
++EXPORT_SYMBOL(tty_set_ldisc);
+ 
+ /**
+  *	tty_ldisc_kill	-	teardown ldisc
+@@ -794,6 +795,7 @@ void tty_ldisc_release(struct tty_struct *tty)
+ 
+ 	tty_ldisc_debug(tty, "released\n");
+ }
++EXPORT_SYMBOL(tty_ldisc_release);
+ 
+ /**
+  *	tty_ldisc_init		-	ldisc setup for new tty
+diff --git a/drivers/tty/tty_port.c b/drivers/tty/tty_port.c
+index c3f9d93ba227..e2aea3d710bb 100644
+--- a/drivers/tty/tty_port.c
++++ b/drivers/tty/tty_port.c
+@@ -335,7 +335,7 @@ EXPORT_SYMBOL(tty_port_lower_dtr_rts);
   *	tty_port_block_til_ready	-	Waiting logic for tty open
   *	@port: the tty port being opened
   *	@tty: the tty device being bound
@@ -62,52 +139,45 @@ Index: linux-4.10.1/drivers/tty/tty_port.c
   *
   *	Implement the core POSIX/SuS tty behaviour when opening a tty device.
   *	Handles:
-@@ -369,7 +369,7 @@
-		tty_port_set_active(port, 1);
-		return 0;
-	}
+@@ -369,7 +369,7 @@ int tty_port_block_til_ready(struct tty_port *port,
+ 		tty_port_set_active(port, 1);
+ 		return 0;
+ 	}
 -	if (filp->f_flags & O_NONBLOCK) {
 +	if (filp ==  NULL || filp->f_flags & O_NONBLOCK) {
-		/* Indicate we are open */
-		if (C_BAUD(tty))
-			tty_port_raise_dtr_rts(port);
-Index: linux-4.10.1/include/linux/tty.h
-===================================================================
---- linux-4.10.1.orig/include/linux/tty.h
-+++ linux-4.10.1/include/linux/tty.h
-@@ -394,6 +394,8 @@
+ 		/* Indicate we are open */
+ 		if (C_BAUD(tty))
+ 			tty_port_raise_dtr_rts(port);
+diff --git a/include/linux/tty.h b/include/linux/tty.h
+index 40144f382516..4530513e0518 100644
+--- a/include/linux/tty.h
++++ b/include/linux/tty.h
+@@ -394,6 +394,9 @@ extern struct tty_struct *get_current_tty(void);
  /* tty_io.c */
  extern int __init tty_init(void);
  extern const char *tty_name(const struct tty_struct *tty);
 +extern struct tty_struct *tty_open_by_driver(dev_t device, struct inode *inode,
 +					     struct file *filp);
++extern int tty_dev_name_to_number(const char *name, dev_t *number);
  #else
  static inline void console_init(void)
  { }
-Index: linux-stable/drivers/tty/tty_ldisc.c
-===================================================================
---- linux-stable.orig/drivers/tty/tty_ldisc.c
-+++ linux-stable/drivers/tty/tty_ldisc.c
-@@ -602,6 +602,7 @@
- 	tty_unlock(tty);
- 	return retval;
- }
-+EXPORT_SYMBOL(tty_set_ldisc);
+@@ -416,6 +419,11 @@ static inline int __init tty_init(void)
+ { return 0; }
+ static inline const char *tty_name(const struct tty_struct *tty)
+ { return "(none)"; }
++static inline struct tty_struct *tty_open_by_driver(dev_t device,
++		struct inode *inode, struct file *filp)
++{ return NULL; }
++static inline int tty_dev_name_to_number(const char *name, dev_t *number)
++{ return -ENOTSUPP; }
+ #endif
  
- /**
-  *	tty_ldisc_kill	-	teardown ldisc
-@@ -794,6 +795,7 @@
- 
- 	tty_ldisc_debug(tty, "released\n");
- }
-+EXPORT_SYMBOL(tty_ldisc_release);
- 
- /**
-  *	tty_ldisc_init		-	ldisc setup for new tty
-Index: linux-stable/include/uapi/linux/tty.h
-===================================================================
---- linux-stable.orig/include/uapi/linux/tty.h
-+++ linux-stable/include/uapi/linux/tty.h
+ extern struct ktermios tty_std_termios;
+diff --git a/include/uapi/linux/tty.h b/include/uapi/linux/tty.h
+index 01c4410352ff..7d3ed92df24a 100644
+--- a/include/uapi/linux/tty.h
++++ b/include/uapi/linux/tty.h
 @@ -35,5 +35,6 @@
  #define N_TRACESINK	23	/* Trace data routing for MIPI P1149.7 */
  #define N_TRACEROUTER	24	/* Trace data routing for MIPI P1149.7 */
